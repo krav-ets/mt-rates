@@ -1,78 +1,76 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-/* import '@fontsource/roboto/300.css';
-import '@fontsource/roboto/400.css';
-import '@fontsource/roboto/500.css';
-import '@fontsource/roboto/700.css'; */
-import { styled, createTheme, ThemeProvider } from '@mui/material/styles';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
 import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
-import Grid from '@mui/material/Grid';
+
 import Container from '@mui/material/Container';
 
-import CourseTable from '../CourseTable';
+import * as Api from '../../helpers/api';
+import Table from '../Table';
+import Calculator from '../Calculator';
+import { COMPANIES } from '../../helpers/constant';
 
-const defaultTheme =
-  createTheme(/* {
-  breakpoints: {},
-} */);
+const defaultTheme = createTheme();
+
+const fetchKoronaRates = async () => {
+  const name = 'korona';
+  try {
+    const response = await Api.getRatesData(name);
+    const { exchangeRate, sendingTransferCommission, sendingAmount, receivingAmount } = response?.data?.[0] || {};
+    const data = {
+      name,
+      rate: exchangeRate,
+      commission: sendingTransferCommission,
+      sendingAmount,
+      receivingAmount,
+      error: null,
+    };
+    return { [name]: data };
+  } catch (e) {
+    return { [name]: { error: e } };
+  }
+};
+const getRatesTableData = (rates, companies) =>
+  companies.map(({ name, title }) => {
+    const columns = ['rate'];
+    return [title, ...columns.map((column) => rates?.[name]?.[column])];
+  });
 
 function Popup() {
-  const [from, setFrom] = React.useState(10);
+  const [rates, setRates] = useState(null);
+  const [ratesTableData, setRatesTableData] = useState(getRatesTableData(null, COMPANIES));
 
-  const handleChange = (event) => {
-    setFrom(event.target.value);
+  const fetchAllRates = () => {
+    Promise.allSettled([fetchKoronaRates()]).then((results) => {
+      const ratesData = results.reduce((acc, result) => ({ ...acc, ...result.value }), {});
+      setRates(ratesData);
+    });
   };
+
+  useEffect(() => {
+    fetchAllRates();
+  }, []);
+
+  useEffect(() => {
+    const tableData = getRatesTableData(rates, COMPANIES);
+    setRatesTableData(tableData);
+  }, [rates]);
 
   return (
     <ThemeProvider theme={defaultTheme}>
       <CssBaseline />
       <Box
+        p={2}
         sx={{
-          border: '1px solid grey',
-          height: '400px',
           width: '500px',
+          backgroundColor: 'lightgray',
         }}
       >
-        <Container
-          sx={{
-            padding: '10px',
-          }}
-        >
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <TextField id="country" fullWidth size="small" select onChange={handleChange} defaultValue={20} label="From">
-                <MenuItem value={10}>Ten</MenuItem>
-                <MenuItem value={20}>Twenty</MenuItem>
-                <MenuItem value={30}>Thirty</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField id="countr" fullWidth size="small" select onChange={handleChange} defaultValue={30} label="To">
-                <MenuItem value={10}>Ten</MenuItem>
-                <MenuItem value={20}>Twenty</MenuItem>
-                <MenuItem value={30}>Thirty</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField id="country" fullWidth size="small" select onChange={handleChange} defaultValue={20}>
-                <MenuItem value={10}>Ten</MenuItem>
-                <MenuItem value={20}>Twenty</MenuItem>
-                <MenuItem value={30}>Thirty</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField id="countr" fullWidth size="small" select onChange={handleChange} defaultValue={30}>
-                <MenuItem value={10}>Ten</MenuItem>
-                <MenuItem value={20}>Twenty</MenuItem>
-                <MenuItem value={30}>Thirty</MenuItem>
-              </TextField>
-            </Grid>
-          </Grid>
-          <CourseTable />
+        <Container disableGutters>
+          <Table data={ratesTableData} />
+          <Calculator rates={rates} />
         </Container>
       </Box>
     </ThemeProvider>
